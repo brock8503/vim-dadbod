@@ -5,16 +5,17 @@ endfunction
 function! s:command_for_url(url, subcmd) abort
   let cmd = ['bq']
   let parsed = db#url#parse(a:url)
+
   if has_key(parsed, 'opaque')
-    let host_targets = split(substitute(parsed.opaque, '/', '', 'g'), ':')
+    let g:bigquery_host_targets = split(substitute(parsed.opaque, '/', '', 'g'), ':')
 
     " If the host is specified as bigquery:project:dataset, then parse
     " the optional (project, dataset) to supply them to the CLI.
-    if len(host_targets) == 2
-      call add(cmd, '--project_id=' . host_targets[0])
-      call add(cmd, '--dataset_id=' . host_targets[1])
-    elseif len(host_targets) == 1
-      call add(cmd, '--project_id=' . host_targets[0])
+    if len(g:bigquery_host_targets) == 2
+      call add(cmd, '--project_id=' . g:bigquery_host_targets[0])
+      call add(cmd, '--dataset_id=' . g:bigquery_host_targets[1])
+    elseif len(g:bigquery_host_targets) == 1
+      call add(cmd, '--project_id=' . g:bigquery_host_targets[0])
     endif
   endif
 
@@ -26,9 +27,14 @@ function! s:command_for_url(url, subcmd) abort
 endfunction
 
 function! db#adapter#bigquery#filter(url) abort
-  return s:command_for_url(a:url, 'query')
+  return extend(s:command_for_url(a:url, 'query'), ['--use_legacy_sql=false', '--max_rows=100000'])
 endfunction
 
 function! db#adapter#bigquery#interactive(url) abort
-  return s:command_for_url(a:url, 'shell')
+  return extend(s:command_for_url(a:url, 'query'), ['--use_legacy_sql=false', '--format=csv', '--max_rows=100000'])
+endfunction
+
+function! db#adapter#bigquery#tables(url) abort
+  return map(db#systemlist(s:command_for_url(a:url, 'ls'))[2:],
+        \ {_, val -> substitute(val, '\s', '', 'g')})
 endfunction
